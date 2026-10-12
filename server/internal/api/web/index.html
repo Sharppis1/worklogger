@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Worklogger reports</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">WORKLOGGER</p>
+        <h1>Work report</h1>
+        <p class="subtitle">A local, privacy-preserving view of your interpreted activity.</p>
+      </div>
+      <form id="filters">
+        <label>
+          Report date
+          <input id="date" name="date" type="date" required>
+        </label>
+        <label>
+          Time zone
+          <input id="timezone" name="timezone" type="text" required>
+        </label>
+        <button type="submit">Refresh</button>
+      </form>
+    </header>
+
+    <p id="status" role="status" aria-live="polite">Loading report…</p>
+
+    <section class="cards" aria-label="Daily totals">
+      <article>
+        <span>Work</span>
+        <strong id="work-total">—</strong>
+      </article>
+      <article>
+        <span>Private / other</span>
+        <strong id="private-total">—</strong>
+      </article>
+      <article>
+        <span>Tracked</span>
+        <strong id="tracked-total">—</strong>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">TREND</p>
+          <h2>Last 7 days</h2>
+        </div>
+        <span class="legend"><i></i> Work hours</span>
+      </div>
+      <div id="week-chart" class="week-chart"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">BREAKDOWN</p>
+          <h2>Work by topic</h2>
+        </div>
+      </div>
+      <div id="topics" class="topics"></div>
+    </section>
+
+    <footer>
+      Data is read from the local Worklogger API. Private activity details never leave the Mac client.
+    </footer>
+  </main>
+</body>
+</html>

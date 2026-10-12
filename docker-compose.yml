@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: worklogger
+      POSTGRES_USER: worklogger
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
+    volumes:
+      - worklogger-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U worklogger -d worklogger"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  server:
+    build:
+      context: ./server
+    environment:
+      DATABASE_URL: postgres://worklogger:${POSTGRES_PASSWORD:-local-development-only}@postgres:5432/worklogger?sslmode=disable
+      LISTEN_ADDR: 0.0.0.0:8080
+    ports:
+      - "127.0.0.1:${WORKLOGGER_PORT:-8787}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/worklogger", "--healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  worklogger-postgres:

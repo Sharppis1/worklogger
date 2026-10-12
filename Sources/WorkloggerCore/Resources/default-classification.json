@@ -1,0 +1,25 @@
+{
+  "workApplications": [
+    "Jira", "Confluence", "Slack", "Microsoft Teams", "Microsoft Outlook",
+    "Microsoft Word", "Microsoft Excel", "Microsoft PowerPoint", "Microsoft OneNote"
+  ],
+  "workBundleIdentifiers": [
+    "com.tinyspeck.slackmacgap", "com.microsoft.teams2", "com.microsoft.Outlook",
+    "com.microsoft.Word", "com.microsoft.Excel", "com.microsoft.Powerpoint",
+    "com.microsoft.onenote.mac"
+  ],
+  "browserBundleIdentifiers": [
+    "com.apple.Safari", "com.google.Chrome", "com.microsoft.edgemac"
+  ],
+  "terminalBundleIdentifiers": [
+    "com.apple.Terminal", "com.googlecode.iterm2", "dev.warp.Warp-Stable"
+  ],
+  "workRepositories": ["digitie", "mfiles", "jira-modules", "sparx"],
+  "workHosts": [
+    {"host": "ansfinland.fi", "includeSubdomains": true},
+    {"host": "extra.tie.fintraffic.fi", "includeSubdomains": false}
+  ],
+  "parallelsBundleIdentifiers": ["com.parallels.desktop.console", "com.parallels.desktop"],
+  "idleUncertainAfterSeconds": 900,
+  "privateRetentionHours": 24
+}
