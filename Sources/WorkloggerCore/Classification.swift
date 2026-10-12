@@ -68,10 +68,20 @@ public struct Classifier: Sendable {
     public func classify(
         observation: Observation,
         activeCorrection: ManualCorrection? = nil,
-        windowsGuestObservation: Observation? = nil
+        windowsGuestObservation: Observation? = nil,
+        userRules: [UserClassificationRule] = []
     ) -> Classification {
         if let correction = activeCorrection, correction.isActive(at: observation.occurredAt) {
             return classify(correction)
+        }
+        if let rule = userRules.first(where: { $0.matches(observation) }) {
+            return Classification(
+                state: .work,
+                topic: rule.topic,
+                source: observation.source,
+                confidence: 1,
+                reason: "Local user rule"
+            )
         }
 
         switch observation.kind {

@@ -49,7 +49,8 @@ private struct WorkloggerMenu: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: engine.current.state.symbol)
                     .font(.title2)
@@ -101,6 +102,18 @@ private struct WorkloggerMenu: View {
                 Button("Resume") { engine.resume() }
             }
 
+            if !engine.privateActivities.isEmpty {
+                Divider()
+                DisclosureGroup("Review private / unclassified") {
+                    VStack(spacing: 10) {
+                        ForEach(engine.privateActivities.prefix(8)) { activity in
+                            PrivateActivityRow(activity: activity, engine: engine)
+                        }
+                    }
+                    .padding(.top, 8)
+                }
+            }
+
             Button(engine.isDemoMode ? "Disable simulation mode" : "Enable simulation mode") {
                 engine.setDemoMode(!engine.isDemoMode)
             }
@@ -126,9 +139,11 @@ private struct WorkloggerMenu: View {
                 Spacer()
                 Button("Quit") { NSApplication.shared.terminate(nil) }
             }
+            }
         }
         .padding()
-        .frame(width: 380)
+        .frame(width: 420)
+        .frame(maxHeight: 720)
     }
 
     private var contextLine: String {
@@ -160,6 +175,49 @@ private struct WorkloggerMenu: View {
             launchAtLogin = enabled
         } catch {
             launchAtLogin = SMAppService.mainApp.status == .enabled
+        }
+    }
+
+    private struct PrivateActivityRow: View {
+        let activity: PrivateActivitySummary
+        @ObservedObject var engine: WorkloggerEngine
+        @State private var topic: String
+
+        init(activity: PrivateActivitySummary, engine: WorkloggerEngine) {
+            self.activity = activity
+            self.engine = engine
+            _topic = State(initialValue: activity.displayName)
+        }
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(activity.displayName).lineLimit(1)
+                        Text(reviewDuration(activity.seconds))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                HStack {
+                    TextField("Work topic", text: $topic)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Count as work") {
+                        engine.classifyAsWork(activity, topic: topic)
+                    }
+                    .disabled(topic.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(8)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        }
+
+        private func reviewDuration(_ seconds: TimeInterval) -> String {
+            let minutes = max(1, Int(seconds / 60))
+            return minutes < 60
+                ? "\(minutes) min in the last 24 hours"
+                : String(format: "%dh %02dm in the last 24 hours", minutes / 60, minutes % 60)
         }
     }
 }

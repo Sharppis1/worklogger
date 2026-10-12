@@ -61,4 +61,64 @@ final class PersistenceTests: XCTestCase {
         let active = try await store.activeCorrection(at: now.addingTimeInterval(1))
         XCTAssertNil(active)
     }
+
+    func testPrivateActivitiesAreGroupedAndUserRuleReclassifiesFutureEvents() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let store = try SQLiteStore(
+            url: directory.appending(path: "test.sqlite3"),
+            privateRetentionHours: 24
+        )
+        let classifier = Classifier(config: try ClassificationConfig.bundled())
+        let now = Date()
+        try await store.save(Observation(
+            occurredAt: now.addingTimeInterval(-20),
+            kind: .activeApplication,
+            source: "macos",
+            application: "Internal Tool",
+            bundleIdentifier: "example.internal"
+        ), privacy: "private")
+        try await store.save(Observation(
+            occurredAt: now.addingTimeInterval(-10),
+            kind: .activeApplication,
+            source: "macos",
+            application: "Internal Tool",
+            bundleIdentifier: "example.internal"
+        ), privacy: "private")
+        try await store.save(Observation(
+            occurredAt: now.addingTimeInterval(-5),
+            kind: .activeApplication,
+            source: "macos",
+            application: "Google Chrome",
+            bundleIdentifier: "com.google.Chrome"
+        ), privacy: "private")
+
+        let summaries = try await store.privateActivitySummaries(
+            since: now.addingTimeInterval(-60),
+            now: now,
+            classifier: classifier,
+            userRules: []
+        )
+        XCTAssertEqual(summaries.count, 1)
+        XCTAssertEqual(summaries[0].displayName, "Internal Tool")
+        XCTAssertEqual(summaries[0].seconds, 15, accuracy: 0.1)
+
+        let rule = UserClassificationRule(
+            kind: .applicationBundle,
+            matchValue: "example.internal",
+            topic: "Internal project"
+        )
+        try await store.save(rule)
+        let savedRules = try await store.userRules()
+        let classification = classifier.classify(
+            observation: Observation(
+                kind: .activeApplication,
+                source: "macos",
+                application: "Internal Tool",
+                bundleIdentifier: "example.internal"
+            ),
+            userRules: savedRules
+        )
+        XCTAssertEqual(classification.state, .work)
+        XCTAssertEqual(classification.topic, "Internal project")
+    }
 }

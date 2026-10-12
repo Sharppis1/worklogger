@@ -76,6 +76,14 @@ public actor SQLiteStore {
             );
             CREATE INDEX IF NOT EXISTS intervals_time_idx
                 ON classified_intervals(started_at, ended_at);
+            CREATE TABLE IF NOT EXISTS user_classification_rules (
+                id TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                match_value TEXT NOT NULL,
+                topic TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                UNIQUE(kind, match_value)
+            );
             """)
     }
 
@@ -168,6 +176,129 @@ public actor SQLiteStore {
             "UPDATE corrections SET synced_at = ? WHERE id = ?",
             [.double(date.timeIntervalSince1970), .text(id.uuidString)]
         )
+    }
+
+    public func save(_ rule: UserClassificationRule) throws {
+        try run(
+            """
+            INSERT INTO user_classification_rules(id, kind, match_value, topic, created_at)
+            VALUES(?, ?, ?, ?, ?)
+            ON CONFLICT(kind, match_value) DO UPDATE SET
+                id = excluded.id,
+                topic = excluded.topic,
+                created_at = excluded.created_at
+            """,
+            [
+                .text(rule.id.uuidString),
+                .text(rule.kind.rawValue),
+                .text(rule.matchValue),
+                .text(rule.topic),
+                .double(rule.createdAt.timeIntervalSince1970)
+            ]
+        )
+    }
+
+    public func userRules() throws -> [UserClassificationRule] {
+        var statement: OpaquePointer?
+        let sql = """
+            SELECT id, kind, match_value, topic, created_at
+            FROM user_classification_rules
+            ORDER BY created_at DESC
+            """
+        guard sqlite3_prepare_v2(handle.pointer, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw PersistenceError.sqlite(Self.errorMessage(handle.pointer))
+        }
+        defer { sqlite3_finalize(statement) }
+        var rules: [UserClassificationRule] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard
+                let idText = sqlite3_column_text(statement, 0),
+                let id = UUID(uuidString: String(cString: idText)),
+                let kindText = sqlite3_column_text(statement, 1),
+                let kind = UserRuleKind(rawValue: String(cString: kindText)),
+                let matchText = sqlite3_column_text(statement, 2),
+                let topicText = sqlite3_column_text(statement, 3)
+            else { continue }
+            rules.append(UserClassificationRule(
+                id: id,
+                kind: kind,
+                matchValue: String(cString: matchText),
+                topic: String(cString: topicText),
+                createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 4))
+            ))
+        }
+        return rules
+    }
+
+    public func privateActivitySummaries(
+        since: Date,
+        now: Date,
+        classifier: Classifier,
+        userRules: [UserClassificationRule]
+    ) throws -> [PrivateActivitySummary] {
+        let rows = try query(
+            """
+            SELECT payload FROM observations
+            WHERE occurred_at >= ? AND occurred_at <= ?
+            ORDER BY occurred_at
+            """,
+            [.double(since.timeIntervalSince1970), .double(now.timeIntervalSince1970)]
+        )
+        let observations = try rows.map { try decoder.decode(Observation.self, from: $0) }
+        struct Group {
+            var displayName: String
+            var seconds: TimeInterval = 0
+            var intervals: [DateInterval] = []
+        }
+        var groups: [String: Group] = [:]
+
+        for (index, observation) in observations.enumerated() {
+            let classification = classifier.classify(observation: observation, userRules: userRules)
+            guard classification.state == .nonWork || classification.state == .uncertain else { continue }
+            let identity: (UserRuleKind, String, String)?
+            if observation.kind == .browserHost, let host = observation.host {
+                identity = (.browserHost, host, host)
+            } else if observation.kind == .activeApplication,
+                      let bundle = observation.bundleIdentifier,
+                      !classifier.config.browserBundleIdentifiers.contains(bundle),
+                      let application = observation.application {
+                identity = (.applicationBundle, bundle, application)
+            } else {
+                identity = nil
+            }
+            guard let (kind, value, displayName) = identity else { continue }
+
+            let nextDate = index + 1 < observations.count ? observations[index + 1].occurredAt : now
+            let end = min(nextDate, observation.occurredAt.addingTimeInterval(60), now)
+            guard end > observation.occurredAt else { continue }
+            let interval = DateInterval(start: observation.occurredAt, end: end)
+            let key = "\(kind.rawValue):\(value)"
+            var group = groups[key] ?? Group(displayName: displayName)
+            group.seconds += interval.duration
+            if let last = group.intervals.last, interval.start.timeIntervalSince(last.end) <= 10 {
+                group.intervals[group.intervals.count - 1] = DateInterval(
+                    start: last.start,
+                    end: max(last.end, interval.end)
+                )
+            } else {
+                group.intervals.append(interval)
+            }
+            groups[key] = group
+        }
+
+        return groups.compactMap { key, group in
+            guard let separator = key.firstIndex(of: ":"),
+                  let kind = UserRuleKind(rawValue: String(key[..<separator])) else { return nil }
+            let value = String(key[key.index(after: separator)...])
+            return PrivateActivitySummary(
+                kind: kind,
+                matchValue: value,
+                displayName: group.displayName,
+                seconds: group.seconds,
+                intervals: group.intervals
+            )
+        }
+        .sorted { $0.seconds > $1.seconds }
     }
 
     public func totals(for day: Date, calendar: Calendar = .current) throws -> DailyTotals {

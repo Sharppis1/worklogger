@@ -43,12 +43,24 @@ public struct PrivacyBoundary: Sendable {
         self.classifier = classifier
     }
 
-    public func localPrivacy(for observation: Observation) -> String {
-        classifier.classify(observation: observation).state == .nonWork ? "private" : "work"
+    public func localPrivacy(
+        for observation: Observation,
+        userRules: [UserClassificationRule] = []
+    ) -> String {
+        let state = classifier.classify(observation: observation, userRules: userRules).state
+        return state == .work || state == .meeting ? "work" : "private"
     }
 
-    public func sanitize(_ observation: Observation, activeCorrection: ManualCorrection? = nil) -> ObservationEnvelope {
-        let classification = classifier.classify(observation: observation, activeCorrection: activeCorrection)
+    public func sanitize(
+        _ observation: Observation,
+        activeCorrection: ManualCorrection? = nil,
+        userRules: [UserClassificationRule] = []
+    ) -> ObservationEnvelope {
+        let classification = classifier.classify(
+            observation: observation,
+            activeCorrection: activeCorrection,
+            userRules: userRules
+        )
         let isWork = classification.state == .work || classification.state == .meeting
         return ObservationEnvelope(
             id: observation.id,

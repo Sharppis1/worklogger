@@ -183,3 +183,63 @@ public struct ClassifiedInterval: Codable, Identifiable, Equatable, Sendable {
         self.classification = classification
     }
 }
+
+public enum UserRuleKind: String, Codable, Sendable {
+    case applicationBundle = "application_bundle"
+    case browserHost = "browser_host"
+}
+
+public struct UserClassificationRule: Codable, Identifiable, Equatable, Sendable {
+    public let id: UUID
+    public let kind: UserRuleKind
+    public let matchValue: String
+    public let topic: String
+    public let createdAt: Date
+
+    public init(
+        id: UUID = UUID(),
+        kind: UserRuleKind,
+        matchValue: String,
+        topic: String,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.kind = kind
+        self.matchValue = matchValue
+        self.topic = topic
+        self.createdAt = createdAt
+    }
+
+    public func matches(_ observation: Observation) -> Bool {
+        switch kind {
+        case .applicationBundle:
+            observation.bundleIdentifier == matchValue
+        case .browserHost:
+            observation.host?.caseInsensitiveCompare(matchValue) == .orderedSame
+        }
+    }
+}
+
+public struct PrivateActivitySummary: Identifiable, Equatable, Sendable {
+    public let kind: UserRuleKind
+    public let matchValue: String
+    public let displayName: String
+    public let seconds: TimeInterval
+    public let intervals: [DateInterval]
+
+    public var id: String { "\(kind.rawValue):\(matchValue)" }
+
+    public init(
+        kind: UserRuleKind,
+        matchValue: String,
+        displayName: String,
+        seconds: TimeInterval,
+        intervals: [DateInterval]
+    ) {
+        self.kind = kind
+        self.matchValue = matchValue
+        self.displayName = displayName
+        self.seconds = seconds
+        self.intervals = intervals
+    }
+}

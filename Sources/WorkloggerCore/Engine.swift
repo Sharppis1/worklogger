@@ -11,6 +11,7 @@ public final class WorkloggerEngine: ObservableObject {
     @Published public private(set) var totals = DailyTotals()
     @Published public private(set) var lastError: String?
     @Published public private(set) var isDemoMode: Bool
+    @Published public private(set) var privateActivities: [PrivateActivitySummary] = []
 
     public let config: ClassificationConfig
     private let classifier: Classifier
@@ -108,6 +109,49 @@ public final class WorkloggerEngine: ObservableObject {
         }
     }
 
+    public func refreshPrivateActivities() {
+        Task {
+            do {
+                try await loadPrivateActivities(now: Date())
+            } catch {
+                lastError = error.localizedDescription
+            }
+        }
+    }
+
+    public func classifyAsWork(_ summary: PrivateActivitySummary, topic: String) {
+        let normalizedTopic = topic.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTopic.isEmpty else { return }
+        Task {
+            do {
+                let now = Date()
+                try await store.save(UserClassificationRule(
+                    kind: summary.kind,
+                    matchValue: summary.matchValue,
+                    topic: normalizedTopic,
+                    createdAt: now
+                ))
+                for interval in summary.intervals {
+                    try await store.save(ManualCorrection(
+                        createdAt: now,
+                        effectiveFrom: interval.start,
+                        effectiveUntil: interval.end,
+                        kind: .previousIntervalWork,
+                        topic: normalizedTopic
+                    ))
+                }
+                try await loadPrivateActivities(now: now)
+                do {
+                    try await syncClient.syncPending()
+                } catch {
+                    // Corrections remain buffered until the loopback service returns.
+                }
+            } catch {
+                lastError = error.localizedDescription
+            }
+        }
+    }
+
     private func addCorrection(kind: OverrideKind, duration minutes: Int, topic: String? = nil) {
         let now = Date()
         persist(ManualCorrection(
@@ -134,11 +178,13 @@ public final class WorkloggerEngine: ObservableObject {
         let observation = collector.currentObservation()
         do {
             let activeCorrection = try await store.activeCorrection(at: now)
+            let userRules = try await store.userRules()
             let next = classifier.classify(
                 observation: observation,
-                activeCorrection: activeCorrection
+                activeCorrection: activeCorrection,
+                userRules: userRules
             )
-            let privacyLevel = privacy.localPrivacy(for: observation)
+            let privacyLevel = privacy.localPrivacy(for: observation, userRules: userRules)
             try await store.save(observation, privacy: privacyLevel)
 
             if let start = previousTick, now > start {
@@ -152,6 +198,7 @@ public final class WorkloggerEngine: ObservableObject {
             current = next
             totals = try await store.totals(for: now)
             try await store.purgeExpiredPrivateDetails(now: now)
+            try await loadPrivateActivities(now: now, userRules: userRules)
             lastError = nil
             do {
                 try await syncClient.syncPending()
@@ -161,5 +208,23 @@ public final class WorkloggerEngine: ObservableObject {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    private func loadPrivateActivities(
+        now: Date,
+        userRules: [UserClassificationRule]? = nil
+    ) async throws {
+        let rules: [UserClassificationRule]
+        if let userRules {
+            rules = userRules
+        } else {
+            rules = try await store.userRules()
+        }
+        privateActivities = try await store.privateActivitySummaries(
+            since: now.addingTimeInterval(-TimeInterval(config.privateRetentionHours * 3_600)),
+            now: now,
+            classifier: classifier,
+            userRules: rules
+        )
     }
 }

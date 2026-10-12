@@ -19,7 +19,15 @@ public actor SyncClient {
     public func syncPending() async throws {
         for observation in try await store.pendingObservations() {
             let correction = try await store.activeCorrection(at: observation.occurredAt)
-            try await post(privacy.sanitize(observation, activeCorrection: correction), path: "v1/observations")
+            let rules = try await store.userRules()
+            try await post(
+                privacy.sanitize(
+                    observation,
+                    activeCorrection: correction,
+                    userRules: rules
+                ),
+                path: "v1/observations"
+            )
             try await store.markObservationSynced(id: observation.id)
         }
         for correction in try await store.pendingCorrections() {

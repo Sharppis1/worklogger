@@ -35,3 +35,8 @@ Any new collector must emit the shared `Observation` model and must pass
 outbound data through `PrivacyBoundary`. A collector that needs content,
 commands, titles, screenshots, or global browsing history is out of scope and
 must not be added.
+
+User-approved classification rules are stored only in the local SQLite
+database. Reviewing an unknown application or host sends bounded work
+corrections and the chosen topic to the server, but never sends the private
+bundle identifier or hostname that the local rule matches.

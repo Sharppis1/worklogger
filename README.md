@@ -49,6 +49,13 @@ topic, start a bounded break or paper-planning interval, pause for a bounded
 duration, and resume. Corrections are append-only audit events. Active manual
 corrections outrank automatic rules and expire at an explicit timestamp.
 
+The menu's **Review private / unclassified** section groups locally retained
+application and browser-host observations from the last 24 hours. A group can
+be assigned a work topic with **Count as work**. This creates bounded immutable
+corrections for its observed intervals and a local rule for future matching
+activity. Only the topic and corrections sync to the server; the private
+application bundle or host remains on the Mac.
+
 Real collection uses public APIs:
 
 - `NSWorkspace` for the foreground application and sleep/wake notifications.
