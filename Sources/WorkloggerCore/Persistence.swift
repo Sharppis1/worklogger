@@ -135,7 +135,9 @@ public actor SQLiteStore {
             """.replacingOccurrences(of: " AND kind_is_not_resume(payload)", with: ""),
             [.double(date.timeIntervalSince1970), .double(date.timeIntervalSince1970)]
         )
-        return try rows.first.flatMap { try decoder.decode(ManualCorrection.self, from: $0) }
+        guard let row = rows.first else { return nil }
+        let correction = try decoder.decode(ManualCorrection.self, from: row)
+        return correction.kind == .resume ? nil : correction
     }
 
     public func pendingObservations(limit: Int = 200) throws -> [Observation] {

@@ -35,4 +35,30 @@ final class PersistenceTests: XCTestCase {
         XCTAssertEqual(envelope.activity, "private_activity")
         XCTAssertNil(envelope.workTopic)
     }
+
+    func testResumeNeutralizesEarlierActiveOverride() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let store = try SQLiteStore(
+            url: directory.appending(path: "test.sqlite3"),
+            privateRetentionHours: 24
+        )
+        let now = Date()
+        let end = now.addingTimeInterval(3_600)
+        try await store.save(ManualCorrection(
+            createdAt: now.addingTimeInterval(-60),
+            effectiveFrom: now.addingTimeInterval(-60),
+            effectiveUntil: end,
+            kind: .topic,
+            topic: "digitie"
+        ))
+        try await store.save(ManualCorrection(
+            createdAt: now,
+            effectiveFrom: now,
+            effectiveUntil: end,
+            kind: .resume
+        ))
+
+        let active = try await store.activeCorrection(at: now.addingTimeInterval(1))
+        XCTAssertNil(active)
+    }
 }

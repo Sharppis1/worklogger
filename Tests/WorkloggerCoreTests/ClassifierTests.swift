@@ -61,6 +61,18 @@ final class ClassifierTests: XCTestCase {
         XCTAssertEqual(repository.state, .work)
     }
 
+    func testMicrosoftWordBundleIsWork() {
+        let result = classifier.classify(observation: Observation(
+            kind: .activeApplication,
+            source: "macos",
+            application: "Microsoft Word",
+            bundleIdentifier: "com.microsoft.Word"
+        ))
+
+        XCTAssertEqual(result.state, .work)
+        XCTAssertEqual(result.topic, "Microsoft Word")
+    }
+
     func testWindowsGuestSupersedesGenericParallels() {
         let host = Observation(
             kind: .activeApplication,
