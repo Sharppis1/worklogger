@@ -23,8 +23,13 @@ public final class MacSystemCollector: ObservationCollecting {
     private var isLocked = false
     private var isSleeping = false
     private let observers = NotificationBag()
+    private let browserContext: any BrowserContextProviding
 
-    public init(center: NotificationCenter = NSWorkspace.shared.notificationCenter) {
+    public init(
+        center: NotificationCenter = NSWorkspace.shared.notificationCenter,
+        browserContext: any BrowserContextProviding = AppleScriptBrowserContext()
+    ) {
+        self.browserContext = browserContext
         observers.tokens.append(center.addObserver(
             forName: NSWorkspace.sessionDidResignActiveNotification,
             object: nil,
@@ -59,6 +64,17 @@ public final class MacSystemCollector: ObservationCollecting {
             return Observation(kind: .idle, source: "macos", idleSeconds: idle)
         }
         let application = NSWorkspace.shared.frontmostApplication
+        if let bundleIdentifier = application?.bundleIdentifier,
+           let host = browserContext.activeHost(bundleIdentifier: bundleIdentifier) {
+            return Observation(
+                kind: .browserHost,
+                source: "macos",
+                application: application?.localizedName,
+                bundleIdentifier: bundleIdentifier,
+                host: host,
+                idleSeconds: idle
+            )
+        }
         return Observation(
             kind: .activeApplication,
             source: "macos",
@@ -93,6 +109,39 @@ public final class MacSystemCollector: ObservationCollecting {
 
     public static func requestAccessibilityPermission() {
         AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
+    }
+}
+
+@MainActor
+public protocol BrowserContextProviding {
+    func activeHost(bundleIdentifier: String) -> String?
+}
+
+@MainActor
+public final class AppleScriptBrowserContext: BrowserContextProviding {
+    public init() {}
+
+    public func activeHost(bundleIdentifier: String) -> String? {
+        let source: String
+        switch bundleIdentifier {
+        case "com.google.Chrome":
+            source = #"tell application id "com.google.Chrome" to get URL of active tab of front window"#
+        case "com.microsoft.edgemac":
+            source = #"tell application id "com.microsoft.edgemac" to get URL of active tab of front window"#
+        case "com.apple.Safari":
+            source = #"tell application id "com.apple.Safari" to get URL of current tab of front window"#
+        default:
+            return nil
+        }
+
+        var error: NSDictionary?
+        guard let value = NSAppleScript(source: source)?.executeAndReturnError(&error).stringValue,
+              error == nil,
+              let components = URLComponents(string: value),
+              let host = components.host else {
+            return nil
+        }
+        return host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
     }
 }
 

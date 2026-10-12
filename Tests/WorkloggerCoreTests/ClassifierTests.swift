@@ -32,6 +32,23 @@ final class ClassifierTests: XCTestCase {
         XCTAssertEqual(extraSubdomain.state, .nonWork)
     }
 
+    func testAnsFinlandSharePointIsWorkWithoutMatchingOtherTenants() {
+        let intranet = classifier.classify(observation: Observation(
+            kind: .browserHost,
+            source: "macos",
+            host: "ansfinland.sharepoint.com"
+        ))
+        let otherTenant = classifier.classify(observation: Observation(
+            kind: .browserHost,
+            source: "macos",
+            host: "other.sharepoint.com"
+        ))
+
+        XCTAssertEqual(intranet.state, .work)
+        XCTAssertEqual(intranet.topic, "ansfinland.sharepoint.com")
+        XCTAssertEqual(otherTenant.state, .nonWork)
+    }
+
     func testLongIdleIsUncertainAndLockedIsNonWork() {
         XCTAssertEqual(classifier.classify(observation: Observation(
             kind: .idle,

@@ -57,6 +57,9 @@ Real collection uses public APIs:
 - Accessibility is **not** needed for those basics. The menu can request it for
   future opt-in browser/repository adapters; macOS System Settings controls the
   permission.
+- Chrome, Edge, and Safari active-tab context uses macOS Automation permission.
+  Only the normalized hostname is retained; URL paths, queries, titles, and
+  browsing history are discarded.
 
 Simulation mode rotates through Slack, a configured repository, generic
 Parallels, long idle, and locked states. Toggle it in the menu or launch with

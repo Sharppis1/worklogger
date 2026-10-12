@@ -17,6 +17,7 @@
   "workRepositories": ["digitie", "mfiles", "jira-modules", "sparx"],
   "workHosts": [
     {"host": "ansfinland.fi", "includeSubdomains": true},
+    {"host": "ansfinland.sharepoint.com", "includeSubdomains": false},
     {"host": "extra.tie.fintraffic.fi", "includeSubdomains": false}
   ],
   "parallelsBundleIdentifiers": ["com.parallels.desktop.console", "com.parallels.desktop"],
