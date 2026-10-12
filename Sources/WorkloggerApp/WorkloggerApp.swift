@@ -21,12 +21,14 @@ struct WorkloggerMenuBarApp: App {
             )
             let demo = ProcessInfo.processInfo.arguments.contains("--demo")
                 || ProcessInfo.processInfo.environment["WORKLOGGER_DEMO"] == "1"
-            _engine = StateObject(wrappedValue: WorkloggerEngine(
+            let appEngine = WorkloggerEngine(
                 config: config,
                 store: store,
                 endpoint: URL(string: "http://127.0.0.1:8787")!,
                 demoMode: demo
-            ))
+            )
+            appEngine.start()
+            _engine = StateObject(wrappedValue: appEngine)
         } catch {
             fatalError("Worklogger cannot initialize: \(error)")
         }
@@ -35,7 +37,6 @@ struct WorkloggerMenuBarApp: App {
     var body: some Scene {
         MenuBarExtra {
             WorkloggerMenu(engine: engine)
-                .onAppear { engine.start() }
         } label: {
             Label(engine.current.state.label, systemImage: engine.current.state.symbol)
         }

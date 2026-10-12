@@ -1,7 +1,7 @@
 import AppKit
 import ApplicationServices
-import CoreGraphics
 import Foundation
+import IOKit
 
 private final class NotificationBag: @unchecked Sendable {
     var tokens: [NSObjectProtocol] = []
@@ -54,7 +54,7 @@ public final class MacSystemCollector: ObservationCollecting {
         if isLocked {
             return Observation(kind: .screenLocked, source: "macos")
         }
-        let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: .null)
+        let idle = Self.systemIdleSeconds()
         if idle >= 60 {
             return Observation(kind: .idle, source: "macos", idleSeconds: idle)
         }
@@ -70,6 +70,25 @@ public final class MacSystemCollector: ObservationCollecting {
 
     public static var accessibilityGranted: Bool {
         AXIsProcessTrusted()
+    }
+
+    private static func systemIdleSeconds() -> TimeInterval {
+        let service = IOServiceGetMatchingService(
+            kIOMainPortDefault,
+            IOServiceMatching("IOHIDSystem")
+        )
+        guard service != IO_OBJECT_NULL else { return 0 }
+        defer { IOObjectRelease(service) }
+
+        guard let property = IORegistryEntryCreateCFProperty(
+            service,
+            "HIDIdleTime" as CFString,
+            kCFAllocatorDefault,
+            0
+        )?.takeRetainedValue() as? NSNumber else {
+            return 0
+        }
+        return property.doubleValue / 1_000_000_000
     }
 
     public static func requestAccessibilityPermission() {
