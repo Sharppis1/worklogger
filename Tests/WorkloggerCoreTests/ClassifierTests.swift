@@ -49,6 +49,34 @@ final class ClassifierTests: XCTestCase {
         XCTAssertEqual(otherTenant.state, .nonWork)
     }
 
+    func testAtlassianRoutesMapToSeparateWorkTopics() {
+        let jiraRule = config.browserTargets.first { $0.topic == "Jira" }!
+        let confluenceRule = config.browserTargets.first { $0.topic == "Confluence" }!
+
+        XCTAssertTrue(jiraRule.matches(URL(string: "https://fintraffictie.atlassian.net/jira/software")!))
+        XCTAssertTrue(confluenceRule.matches(URL(string: "https://fintraffictie.atlassian.net/wiki/spaces")!))
+        XCTAssertFalse(jiraRule.matches(URL(string: "https://other.atlassian.net/jira")!))
+        XCTAssertFalse(jiraRule.matches(URL(string: "https://fintraffictie.atlassian.net/jiraevil")!))
+
+        let jira = classifier.classify(observation: Observation(
+            kind: .browserHost,
+            source: "macos",
+            host: "fintraffictie.atlassian.net",
+            browserTarget: "Jira"
+        ))
+        let confluence = classifier.classify(observation: Observation(
+            kind: .browserHost,
+            source: "macos",
+            host: "fintraffictie.atlassian.net",
+            browserTarget: "Confluence"
+        ))
+
+        XCTAssertEqual(jira.state, .work)
+        XCTAssertEqual(jira.topic, "Jira")
+        XCTAssertEqual(confluence.state, .work)
+        XCTAssertEqual(confluence.topic, "Confluence")
+    }
+
     func testLongIdleIsUncertainAndLockedIsNonWork() {
         XCTAssertEqual(classifier.classify(observation: Observation(
             kind: .idle,

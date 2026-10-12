@@ -14,7 +14,9 @@ deleted after `privateRetentionHours` (24 hours by default).
 For Chrome, Edge, and Safari, the Mac collector may read the active tab URL
 through macOS Automation and immediately reduce it to a normalized hostname.
 Paths, query parameters, fragments, page titles, inactive tabs, and browsing
-history are never retained.
+history are never retained. Configured route rules may convert a path prefix
+directly into a coarse topic such as `Jira` or `Confluence`; the path itself is
+discarded before the observation is persisted.
 
 **Eligible for loopback sync:** event ID/time/type, a coarse source, derived
 state, and a minimal work topic only when classification says work or meeting.

@@ -24,12 +24,15 @@ public final class MacSystemCollector: ObservationCollecting {
     private var isSleeping = false
     private let observers = NotificationBag()
     private let browserContext: any BrowserContextProviding
+    private let browserTargetRules: [BrowserTargetRule]
 
     public init(
         center: NotificationCenter = NSWorkspace.shared.notificationCenter,
-        browserContext: any BrowserContextProviding = AppleScriptBrowserContext()
+        browserContext: any BrowserContextProviding = AppleScriptBrowserContext(),
+        browserTargetRules: [BrowserTargetRule] = []
     ) {
         self.browserContext = browserContext
+        self.browserTargetRules = browserTargetRules
         observers.tokens.append(center.addObserver(
             forName: NSWorkspace.sessionDidResignActiveNotification,
             object: nil,
@@ -65,13 +68,17 @@ public final class MacSystemCollector: ObservationCollecting {
         }
         let application = NSWorkspace.shared.frontmostApplication
         if let bundleIdentifier = application?.bundleIdentifier,
-           let host = browserContext.activeHost(bundleIdentifier: bundleIdentifier) {
+           let context = browserContext.activeContext(
+               bundleIdentifier: bundleIdentifier,
+               targetRules: browserTargetRules
+           ) {
             return Observation(
                 kind: .browserHost,
                 source: "macos",
                 application: application?.localizedName,
                 bundleIdentifier: bundleIdentifier,
-                host: host,
+                host: context.host,
+                browserTarget: context.target,
                 idleSeconds: idle
             )
         }
@@ -114,14 +121,30 @@ public final class MacSystemCollector: ObservationCollecting {
 
 @MainActor
 public protocol BrowserContextProviding {
-    func activeHost(bundleIdentifier: String) -> String?
+    func activeContext(
+        bundleIdentifier: String,
+        targetRules: [BrowserTargetRule]
+    ) -> BrowserContext?
+}
+
+public struct BrowserContext: Equatable, Sendable {
+    public let host: String
+    public let target: String?
+
+    public init(host: String, target: String?) {
+        self.host = host
+        self.target = target
+    }
 }
 
 @MainActor
 public final class AppleScriptBrowserContext: BrowserContextProviding {
     public init() {}
 
-    public func activeHost(bundleIdentifier: String) -> String? {
+    public func activeContext(
+        bundleIdentifier: String,
+        targetRules: [BrowserTargetRule]
+    ) -> BrowserContext? {
         let source: String
         switch bundleIdentifier {
         case "com.google.Chrome":
@@ -137,11 +160,13 @@ public final class AppleScriptBrowserContext: BrowserContextProviding {
         var error: NSDictionary?
         guard let value = NSAppleScript(source: source)?.executeAndReturnError(&error).stringValue,
               error == nil,
-              let components = URLComponents(string: value),
-              let host = components.host else {
+              let url = URL(string: value),
+              let host = url.host else {
             return nil
         }
-        return host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        let normalizedHost = host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        let target = targetRules.first(where: { $0.matches(url) })?.topic
+        return BrowserContext(host: normalizedHost, target: target)
     }
 }
 
@@ -169,6 +194,7 @@ public final class DemoCollector: ObservationCollecting {
             application: template.application,
             bundleIdentifier: template.bundleIdentifier,
             host: template.host,
+            browserTarget: template.browserTarget,
             repository: template.repository,
             idleSeconds: template.idleSeconds
         )

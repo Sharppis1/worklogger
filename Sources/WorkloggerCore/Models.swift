@@ -53,6 +53,7 @@ public struct Observation: Codable, Identifiable, Equatable, Sendable {
     public let application: String?
     public let bundleIdentifier: String?
     public let host: String?
+    public let browserTarget: String?
     public let repository: String?
     public let calendar: CalendarEvent?
     public let idleSeconds: TimeInterval?
@@ -65,6 +66,7 @@ public struct Observation: Codable, Identifiable, Equatable, Sendable {
         application: String? = nil,
         bundleIdentifier: String? = nil,
         host: String? = nil,
+        browserTarget: String? = nil,
         repository: String? = nil,
         calendar: CalendarEvent? = nil,
         idleSeconds: TimeInterval? = nil
@@ -76,6 +78,7 @@ public struct Observation: Codable, Identifiable, Equatable, Sendable {
         self.application = application
         self.bundleIdentifier = bundleIdentifier
         self.host = host
+        self.browserTarget = browserTarget
         self.repository = repository
         self.calendar = calendar
         self.idleSeconds = idleSeconds

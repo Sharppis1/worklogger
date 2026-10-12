@@ -20,6 +20,10 @@
     {"host": "ansfinland.sharepoint.com", "includeSubdomains": false},
     {"host": "extra.tie.fintraffic.fi", "includeSubdomains": false}
   ],
+  "browserTargets": [
+    {"host": "fintraffictie.atlassian.net", "pathPrefix": "/jira", "topic": "Jira"},
+    {"host": "fintraffictie.atlassian.net", "pathPrefix": "/wiki", "topic": "Confluence"}
+  ],
   "parallelsBundleIdentifiers": ["com.parallels.desktop.console", "com.parallels.desktop"],
   "idleUncertainAfterSeconds": 900,
   "privateRetentionHours": 24

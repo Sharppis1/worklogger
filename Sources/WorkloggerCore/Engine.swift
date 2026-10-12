@@ -33,7 +33,9 @@ public final class WorkloggerEngine: ObservableObject {
         self.store = store
         syncClient = SyncClient(baseURL: endpoint, store: store, privacy: privacy)
         isDemoMode = demoMode
-        collector = demoMode ? DemoCollector() : MacSystemCollector()
+        collector = demoMode
+            ? DemoCollector()
+            : MacSystemCollector(browserTargetRules: config.browserTargets)
     }
 
     deinit {
@@ -52,7 +54,9 @@ public final class WorkloggerEngine: ObservableObject {
 
     public func setDemoMode(_ enabled: Bool) {
         isDemoMode = enabled
-        collector = enabled ? DemoCollector() : MacSystemCollector()
+        collector = enabled
+            ? DemoCollector()
+            : MacSystemCollector(browserTargetRules: config.browserTargets)
         previousTick = nil
     }
 

@@ -15,6 +15,29 @@ public struct HostRule: Codable, Equatable, Sendable {
     }
 }
 
+public struct BrowserTargetRule: Codable, Equatable, Sendable {
+    public let host: String
+    public let pathPrefix: String
+    public let topic: String
+
+    public init(host: String, pathPrefix: String, topic: String) {
+        self.host = host.lowercased()
+        self.pathPrefix = pathPrefix.hasPrefix("/") ? pathPrefix : "/" + pathPrefix
+        self.topic = topic
+    }
+
+    public func matches(_ url: URL) -> Bool {
+        guard url.host?.lowercased() == host else { return false }
+        let path = url.path
+        return path == pathPrefix || path.hasPrefix(pathPrefix + "/")
+    }
+
+    public func matches(host candidateHost: String, topic candidateTopic: String) -> Bool {
+        candidateHost.caseInsensitiveCompare(host) == .orderedSame
+            && candidateTopic == topic
+    }
+}
+
 public struct ClassificationConfig: Codable, Equatable, Sendable {
     public var workApplications: [String]
     public var workBundleIdentifiers: [String]
@@ -22,6 +45,7 @@ public struct ClassificationConfig: Codable, Equatable, Sendable {
     public var terminalBundleIdentifiers: [String]
     public var workRepositories: [String]
     public var workHosts: [HostRule]
+    public var browserTargets: [BrowserTargetRule]
     public var parallelsBundleIdentifiers: [String]
     public var idleUncertainAfterSeconds: TimeInterval
     public var privateRetentionHours: Int
@@ -56,6 +80,11 @@ public struct Classifier: Sendable {
         case .idle where (observation.idleSeconds ?? 0) >= config.idleUncertainAfterSeconds:
             return Classification(state: .uncertain, source: observation.source, confidence: 0.4, reason: "Long inactivity is not proof of non-work")
         case .browserHost:
+            if let host = observation.host,
+               let target = observation.browserTarget,
+               config.browserTargets.contains(where: { $0.matches(host: host, topic: target) }) {
+                return Classification(state: .work, topic: target, source: observation.source, confidence: 0.95, reason: "Configured browser target")
+            }
             if let host = observation.host, config.workHosts.contains(where: { $0.matches(host) }) {
                 return Classification(state: .work, topic: host, source: observation.source, confidence: 0.9, reason: "Configured exact host rule")
             }
